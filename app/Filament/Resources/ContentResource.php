@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ContentResource\Pages;
+use App\Forms\Components\VimeoInput;
 use App\Models\Content;
 use Faker\Provider\Text;
 use Filament\Forms\Components\FileUpload;
@@ -38,41 +39,49 @@ class ContentResource extends Resource
                         TextInput::make('name')
                             ->label('Titulo')
                             ->required(),
-                        Textarea::make('description')
-                            ->label('Descrição'),
-                        FileUpload::make('file_path')
-                            ->label('Arquivo')
-                            ->live()
-                            ->afterStateUpdated(function (?TemporaryUploadedFile $state, Set $set) {
-                                $mime = mime_content_type($state->getPath()."/".$state->getFilename());
-                                $size = $state->getSize();
-                                $set('file_size', $size);
-//                                dd($set);
-                            })
-                            ->getUploadedFileNameForStorageUsing(
-                                fn(TemporaryUploadedFile $file): string => (string) str($file->getClientOriginalName())
-                                    ->prepend('custom-prefix-'),
-                            )
-                            ->required(),
-
-
+//                        Textarea::make('description')
+//                            ->label('Descrição'),
 
                         Select::make('file_storage_type')
                             ->label('Tipo de armazenamento')
-                            ->hidden(fn(Get $get): bool => !$get('file_path'))
                             ->required()
                             ->live()
-                            ->options(fn(Get $get): array => match ($get('file_type')) {
-                                'video' => [
-                                    'local_storage' => 'Armazenamento Local',
-                                    's3' => 'Armazenamento Remoto',
-                                    'vimeo' => 'Vimeo (Apenas Videos)',
-                                ],
-                                default => [
-                                    'local_storage' => 'Armazenamento Local',
-                                    's3' => 'Armazenamento Remoto',
-                                ],
-                            }),
+                            ->options([
+                                'local_storage' => 'Armazenamento Local',
+                                's3' => 'Armazenamento Remoto',
+                                'vimeo' => 'Vimeo (Apenas Videos)',
+                            ]),
+
+                        FileUpload::make('file_path_remote')
+                            ->label('Armazenamento Remoto')
+                            ->hidden(function (Get $get): bool {
+                                return $get('file_storage_type') !== 's3';
+                            })
+                            ->disk('digitalocean')
+                            ->visibility('private')
+                            ->directory('img/covers')
+                            ->openable()
+                            ->required(),
+
+                        FileUpload::make('file_path_local')
+                            ->label('Armazenamento Local')
+                            ->hidden(fn(Get $get): bool => $get('file_storage_type') !== 'local_storage')
+                            ->disk('local')
+                            ->directory('public/img/covers')
+                            ->required(),
+
+                        FileUpload::make('vimeo_video_id')
+                            ->label('Armazenamento Vimeo')
+                            ->hidden(fn(Get $get): bool => $get('file_storage_type') !== 'vimeo')
+                            ->disk('local')
+                            ->directory('temp/vimeo')
+                            ->required(),
+
+//                        VimeoInput::make('file_path_vimeo')
+//                            ->label('Armazenamento Vimeo')
+//                            ->hidden(fn(Get $get): bool => $get('file_storage_type') !== 'vimeo')
+//                            ->required(),
+
 
                     ]),
                 ])->columnSpan(2),
@@ -84,17 +93,24 @@ class ContentResource extends Resource
                         Placeholder::make('updated_at')
                             ->label('Ultima modificação em')
                             ->content(fn(?Content $record): string => $record?->updated_at?->diffForHumans() ?? '-'),
-                        TextInput::make('file_type')
-                            ->label('Tipo do arquivo')
-                            ->disabled()
-                            ->default(fn(?Content $record): string => $record?->file_type ?? '')
-                            ->readOnly(),
-
-                        TextInput::make('file_size')
-                            ->label('Tamanho do arquivo')
-                            ->disabled()
-                            ->default(fn(?Content $record): string => $record?->file_size ?? '')
-                            ->readOnly(),
+//                        TextInput::make('file_type')
+//                            ->label('Tipo do arquivo')
+//                            ->formatStateUsing(fn(?string $state): string => Str::ucfirst($state))
+//                            ->default(fn(?Content $record): string => $record?->file_type ?? '')
+//                            ->readOnly(),
+//                        TextInput::make('file_size')
+//                            ->label('Tamanho do arquivo')
+//                            ->default(fn(?Content $record): string => $record?->file_size ?? '')
+//                            ->live()
+//                            ->formatStateUsing(function ($state) {
+//                                // converte size para human readble format
+//                                $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+//                                for ($i = 0; $state > 1024; $i++) {
+//                                    $state /= 1024;
+//                                }
+//                                return round($state, 2).' '.$units[$i];
+//                            })
+//                            ->readOnly(),
                     ]),
 
                 ])->columnSpan(1),
